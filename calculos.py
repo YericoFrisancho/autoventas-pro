@@ -9,14 +9,13 @@ def generar_cronograma_credito(precio_vehiculo, cuota_inicial_porc, tea, plazo_m
     tep = (1 + tea)**(30/360) - 1 
     
     # Fase 2: Estructuración de la Deuda
-    capital_inicial = precio_vehiculo * (1 - cuota_inicial_porc) 
-    cuota_balon = precio_vehiculo * porcentaje_balon 
+    capital_inicial = float(precio_vehiculo * (1 - cuota_inicial_porc))
+    cuota_balon = float(precio_vehiculo * porcentaje_balon)
     
-    # === NUEVO CÁLCULO DE SEGUROS FIJOS ===
-    # El desgravamen se calcula sobre el capital inicial para mantenerlo constante
-    monto_desgravamen_fijo = capital_inicial * seg_desgravamen_porc 
-    monto_vehicular_fijo = (precio_vehiculo * seg_vehicular_porc) / 12 
-    total_seguros_mensuales = monto_desgravamen_fijo + monto_vehicular_fijo + seguros_opcionales
+    # Cálculo de Seguros Fijos
+    monto_desgravamen_fijo = float(capital_inicial * seg_desgravamen_porc)
+    monto_vehicular_fijo = float((precio_vehiculo * seg_vehicular_porc) / 12)
+    total_seguros_mensuales = float(monto_desgravamen_fijo + monto_vehicular_fijo + seguros_opcionales)
     
     saldo_vigente = capital_inicial
     cronograma = []
@@ -32,57 +31,54 @@ def generar_cronograma_credito(precio_vehiculo, cuota_inicial_porc, tea, plazo_m
         # Evaluación del Período de Gracia
         if t <= meses_gracia and tipo_gracia != 'NINGUNO':
             if tipo_gracia == 'TOTAL':
-                cuota_base_t = 0 
-                amortizacion_t = 0 
-                # El seguro se sigue pagando o se suma al pago total
+                cuota_base_t = 0.0 
+                amortizacion_t = 0.0 
                 pago_total_t = total_seguros_mensuales
-                saldo_vigente += interes_t # Capitalización de intereses
+                saldo_vigente += interes_t 
             elif tipo_gracia == 'PARCIAL':
-                cuota_base_t = interes_t # Solo se pagan intereses
-                amortizacion_t = 0 
+                cuota_base_t = interes_t 
+                amortizacion_t = 0.0 
                 pago_total_t = cuota_base_t + total_seguros_mensuales
         else:
-            # Cálculo normal (Fórmula francesa estándar ajustada al saldo y tiempo restante)
+            # Cálculo normal (Fórmula francesa estándar ajustada)
             plazo_r = plazo_meses - t + 1 
             cuota_base_t = (saldo_vigente - cuota_balon * (1 + tep)**(-plazo_r)) / ((1 - (1 + tep)**(-plazo_r)) / tep) 
             amortizacion_t = cuota_base_t - interes_t 
             saldo_vigente -= amortizacion_t 
             
-            # El pago total ahora es matemáticamente constante en cada periodo regular
             pago_total_t = cuota_base_t + total_seguros_mensuales
             
-        # Condición Lógica de Cierre (Última cuota asume el pago globo)
+        # Condición Lógica de Cierre
         if t == plazo_meses: 
             cuota_base_t += cuota_balon 
             pago_total_t += cuota_balon
             
-        # Registrar línea del cronograma
+        # Registrar línea del cronograma (Asegurando que todo sea float nativo)
         cronograma.append({
             'periodo': t,
             'tipo_gracia': tipo_gracia if t <= meses_gracia else 'NINGUNO',
-            'saldo_inicial': saldo_inicial_t,
-            'interes': interes_t,
-            'cuota': cuota_base_t,
-            'amortizacion': amortizacion_t,
-            'seguros': total_seguros_mensuales, # Ahora es siempre el mismo valor
-            'pago_total': pago_total_t,
-            'saldo_final': saldo_vigente
+            'saldo_inicial': float(saldo_inicial_t),
+            'interes': float(interes_t),
+            'cuota': float(cuota_base_t),
+            'amortizacion': float(amortizacion_t),
+            'seguros': float(total_seguros_mensuales), 
+            'pago_total': float(pago_total_t),
+            'saldo_final': float(saldo_vigente)
         })
         
-        # El deudor desembolsa dinero (flujo negativo)
-        flujos_caja.append(-pago_total_t)
+        flujos_caja.append(-float(pago_total_t))
         
-    # Fase 5: Evaluación Financiera del Préstamo (Perspectiva del deudor)
-    van = npf.npv(cok_mensual, flujos_caja) 
-    tir_mensual = npf.irr(flujos_caja) 
-    tcea = ((1 + tir_mensual)**12) - 1 
+    # Fase 5: Evaluación Financiera
+    van = float(npf.npv(cok_mensual, flujos_caja))
+    tir_mensual = float(npf.irr(flujos_caja))
+    tcea = float(((1 + tir_mensual)**12) - 1)
     
     resultados_financieros = {
         'tcea': tcea,
         'van': van,
         'tir': tir_mensual,
-        'total_pagado': sum(c['pago_total'] for c in cronograma),
-        'intereses_totales': sum(c['interes'] for c in cronograma)
+        'total_pagado': float(sum(c['pago_total'] for c in cronograma)),
+        'intereses_totales': float(sum(c['interes'] for c in cronograma))
     }
     
     return cronograma, resultados_financieros

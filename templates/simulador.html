@@ -2,59 +2,348 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>AutoVentas Pro - Simulador</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AutoVentas Pro - {{ 'Editar Crédito' if edit_mode else 'Catálogo' }}</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-</head>
-<body class="bg-light">
-    <div class="container mt-5">
-        <h2 class="text-primary mb-4">🚗 AutoVentas Pro - Simulador Financiero</h2>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    
+    <style>
+        body {
+            background-color: #f6fbff;
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            min-height: 100vh;
+        }
+
+        .navbar-custom {
+            background-color: #0056ff;
+            padding: 1rem 0;
+        }
         
+        .navbar-brand {
+            font-weight: 800;
+            font-size: 1.5rem;
+            letter-spacing: -0.5px;
+        }
+
+        .nav-link {
+            font-weight: 500;
+            opacity: 0.8;
+            transition: opacity 0.2s;
+        }
+
+        .nav-link.active {
+            font-weight: 700;
+            opacity: 1;
+            background: rgba(255,255,255,0.1);
+            border-radius: 8px;
+        }
+
+        .hero-banner {
+            background: linear-gradient(135deg, #0056ff 0%, #0046d5 100%);
+            color: white;
+            padding: 3rem 0;
+            border-bottom-left-radius: 30px;
+            border-bottom-right-radius: 30px;
+            margin-top: -1.5rem; 
+            margin-bottom: 2rem;
+            box-shadow: 0 10px 20px rgba(0,86,255,0.1);
+        }
+
+        .auto-card .card {
+            border-radius: 16px;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .auto-card .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 30px rgba(0,0,0,0.08) !important;
+        }
+
+        .price-text {
+            color: #0056ff;
+            font-size: 1.4rem;
+            letter-spacing: -0.5px;
+        }
+
+        .filter-bar {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+        }
+
+        .btn-financiar {
+            background-color: #0056ff;
+            color: white;
+            border-radius: 8px;
+            padding: 8px 20px;
+            font-weight: 600;
+            border: none;
+            transition: background 0.2s;
+        }
+
+        .btn-financiar:hover {
+            background-color: #0046d5;
+            color: white;
+        }
+
+        .btn-editar-mode {
+            background-color: #ffc107 !important;
+            color: #000 !important;
+        }
+    </style>
+</head>
+<body>
+    {% set def_vehiculo = credito_edit.id_vehiculo if edit_mode else '' %}
+    {% set def_inicial = credito_edit.cuota_inicial_porc if edit_mode else 20 %}
+    {% set def_plazo = credito_edit.plazo if edit_mode else 24 %}
+    {% set def_tea = credito_edit.tea if edit_mode else 15 %}
+    {% set def_balon = credito_edit.porc_balon if edit_mode else 40 %}
+    {% set def_gracia = credito_edit.tipo_gracia if edit_mode else 'PARCIAL' %}
+    {% set def_meses_gracia = credito_edit.meses_gracia if edit_mode else 2 %}
+    {% set def_desgravamen = credito_edit.seg_desgravamen if edit_mode else 0.05 %}
+    {% set def_vehicular = credito_edit.seg_vehicular if edit_mode else 0.3 %}
+    {% set def_seg = credito_edit.seg_opcional if edit_mode else 0 %}
+
+    <nav class="navbar navbar-expand-lg navbar-dark navbar-custom shadow-sm mb-4">
+        <div class="container">
+            <span class="navbar-brand text-white"><i class="bi bi-car-front-fill me-2"></i>AutoVentas Pro</span>
+            <div class="collapse navbar-collapse ms-4">
+                <ul class="navbar-nav me-auto mb-2 mb-lg-0 gap-2">
+                    <li class="nav-item">
+                        <a class="nav-link text-white px-3 {{ 'active' if not edit_mode else '' }}" href="/simulador">
+                            <i class="bi bi-grid-fill me-1"></i> Catálogo de Autos
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link text-white px-3 {{ 'active' if edit_mode else '' }}" href="/historial">
+                            <i class="bi bi-clock-history me-1"></i> Mi Historial
+                        </a>
+                    </li>
+                </ul>
+            </div>
+            <div class="d-flex text-white align-items-center">
+                <div class="me-3 text-end lh-1">
+                    <small class="d-block opacity-75" style="font-size: 0.75em;">Conectado como</small>
+                    <span class="fw-bold">{{ session['usuario_nombre'] }}</span>
+                </div>
+                <a href="/logout" class="btn btn-light text-primary fw-bold rounded-3 px-3">Salir</a>
+            </div>
+        </div>
+    </nav>
+
+    <div id="vista-catalogo" class="{% if resultados or edit_mode %}d-none{% endif %}">
+        
+        <div class="container">
+            <div class="filter-bar shadow-sm mb-3 border border-light">
+                <h6 class="text-primary fw-bold mb-3"><i class="bi bi-sliders"></i> Filtros</h6>
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <div class="input-group">
+                            <span class="input-group-text bg-white text-muted border-end-0"><i class="bi bi-search"></i></span>
+                            <input type="text" class="form-control border-start-0 ps-0 text-secondary" id="buscadorVehiculos" onkeyup="filtrarAutos()" placeholder="Buscar vehículo...">
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <select class="form-select text-secondary" id="filtroMarca" onchange="filtrarAutos()">
+                            <option value="">Todas las marcas</option>
+                            {% set marcas = [] %}
+                            {% for v in vehiculos %}
+                                {% if v[1] not in marcas %}
+                                    {% set _ = marcas.append(v[1]) %}
+                                    <option value="{{ v[1]|lower }}">{{ v[1] }}</option>
+                                {% endif %}
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <select class="form-select text-secondary" id="filtroPrecio" onchange="filtrarAutos()">
+                            <option value="">Todos los precios</option>
+                            <option value="0-20000">Menos de $20,000</option>
+                            <option value="20000-30000">$20,000 - $30,000</option>
+                            <option value="30000-40000">$30,000 - $40,000</option>
+                            <option value="40000-50000">$40,000 - $50,000</option>
+                            <option value="50000-9999999">Más de $50,000</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <select class="form-select text-secondary" id="filtroAno" onchange="filtrarAutos()">
+                            <option value="">Todos los años</option>
+                            {% set anos = [] %}
+                            {% for v in vehiculos %}
+                                {% if v[3] not in anos %}
+                                    {% set _ = anos.append(v[3]) %}
+                                {% endif %}
+                            {% endfor %}
+                            {% for ano in anos|sort(reverse=True) %}
+                                <option value="{{ ano }}">{{ ano }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mb-3 text-muted fw-bold small ps-2" id="contador-autos">
+                Mostrando {{ vehiculos|length }} vehículos
+            </div>
+
+            <div class="row row-cols-1 row-cols-md-3 g-4 mb-5" id="contenedor-vehiculos">
+                {% set imgs = [
+                    'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&w=600&q=80',
+                    'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&w=600&q=80',
+                    'https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=600&q=80',
+                    'https://images.unsplash.com/photo-1541899481282-d53bffe3c35d?auto=format&fit=crop&w=600&q=80',
+                    'https://images.unsplash.com/photo-1583121274602-3e2820c69888?auto=format&fit=crop&w=600&q=80'
+                ] %}
+
+                {% for v in vehiculos %}
+                <div class="col auto-card" data-marca="{{ v[1]|lower }}" data-texto="{{ v[1]|lower }} {{ v[2]|lower }}" data-precio="{{ v[4] }}" data-ano="{{ v[3] }}">
+                    <div class="card h-100 border-0 shadow-sm overflow-hidden bg-white">
+                        <img src="{{ imgs[v[0] % 5] }}" class="card-img-top" style="height: 200px; object-fit: cover;" alt="{{ v[1] }} {{ v[2] }}">
+                        <div class="card-body p-4">
+                            <small class="text-muted text-uppercase fw-bold" style="font-size: 0.75rem;">{{ v[1] }}</small>
+                            <h5 class="card-title fw-bold text-dark mb-3">{{ v[2] }}</h5>
+                            
+                            <div class="d-flex justify-content-between text-muted small mb-4">
+                                <span title="Año"><i class="bi bi-calendar3"></i> {{ v[3] }}</span>
+                                <span title="Kilometraje"><i class="bi bi-speedometer2"></i> 0 km</span>
+                                <span title="Combustible"><i class="bi bi-fuel-pump"></i> Gasolina</span>
+                            </div>
+                            
+                            <div class="d-flex justify-content-between align-items-center pt-3 border-top">
+                                <h4 class="price-text fw-bold mb-0">${{ "%.0f"|format(v[4]) }}</h4>
+                                <button type="button" class="btn-financiar" onclick="abrirConfigurador('{{ v[0] }}')">Financiar</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+
+    <div id="vista-configurador" class="container {% if not resultados and not edit_mode %}d-none{% endif %}">
+        
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }} alert-dismissible fade show shadow-sm rounded-3">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <div class="mb-4">
+            {% if edit_mode %}
+            <a href="/historial" class="text-primary fw-bold text-decoration-none" style="font-size: 1.1rem;">
+                <i class="bi bi-arrow-left me-1"></i> Volver al Historial
+            </a>
+            {% else %}
+            <button type="button" class="btn btn-link text-primary fw-bold text-decoration-none p-0" style="font-size: 1.1rem;" onclick="volverCatalogo()">
+                <i class="bi bi-arrow-left me-1"></i> Volver al Catálogo
+            </button>
+            {% endif %}
+        </div>
+
         <div class="row">
             <div class="col-md-4">
-                <div class="card shadow-sm">
-                    <div class="card-body">
-                        <form action="/simulador" method="POST">
+                <div class="card shadow-sm border-0 rounded-4">
+                    <div class="card-header bg-{{ 'warning text-dark' if edit_mode else 'primary text-white' }} border-0 py-3 rounded-top-4">
+                        <h5 class="mb-0 fw-bold">
+                            <i class="bi bi-calculator me-2"></i>{{ 'Modificar Operación #' ~ credito_edit.id_credito if edit_mode else 'Configurar Crédito' }}
+                        </h5>
+                    </div>
+                    <div class="card-body p-4 bg-white rounded-bottom-4">
+                        <form action="{{ '/editar/' ~ credito_edit.id_credito if edit_mode else '/simulador' }}" method="POST">
+                            
                             <div class="mb-3">
-                                <label class="form-label">Precio del Vehículo ($)</label>
-                                <input type="number" class="form-control" name="precio" value="12000" required>
-                            </div>
-                            <div class="row mb-3">
-                                <div class="col">
-                                    <label class="form-label">Inicial (%)</label>
-                                    <input type="number" class="form-control" name="cuota_inicial" value="20" required>
-                                </div>
-                                <div class="col">
-                                    <label class="form-label">Plazo (Meses)</label>
-                                    <input type="number" class="form-control" name="plazo" value="24" required>
-                                </div>
-                            </div>
-                            <div class="row mb-3">
-                                <div class="col">
-                                    <label class="form-label">TEA (%)</label>
-                                    <input type="number" step="0.01" class="form-control" name="tea" value="15" required>
-                                </div>
-                                <div class="col">
-                                    <label class="form-label">Cuota Balón (%)</label>
-                                    <input type="number" class="form-control" name="porc_balon" value="30" required>
-                                </div>
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label">Tipo de Gracia</label>
-                                <select class="form-select" name="tipo_gracia">
-                                    <option value="NINGUNO">Sin Gracia</option>
-                                    <option value="PARCIAL" selected>Gracia Parcial</option>
-                                    <option value="TOTAL">Gracia Total</option>
+                                <label class="form-label fw-bold text-dark">Vehículo Seleccionado</label>
+                                <select class="form-select bg-light fw-bold text-primary border-primary" name="id_vehiculo" id="select-vehiculo" required>
+                                    <option value="" disabled {% if not edit_mode %}selected{% endif %}>Elige un modelo...</option>
+                                    {% for v in vehiculos %}
+                                        <option value="{{ v[0] }}" {% if def_vehiculo == v[0] %}selected{% endif %}>
+                                            {{ v[1] }} {{ v[2] }} - ${{ "%.2f"|format(v[4]) }}
+                                        </option>
+                                    {% endfor %}
                                 </select>
                             </div>
-                            <div class="mb-3">
-                                <label class="form-label">Meses de Gracia</label>
-                                <input type="number" class="form-control" name="meses_gracia" value="4">
+                            
+                            <hr class="text-muted my-4">
+
+                            <div class="row mb-3">
+                                <div class="col">
+                                    <label class="form-label text-secondary fw-bold" style="font-size: 0.85em;">Inicial (%)</label>
+                                    <input type="number" class="form-control" name="cuota_inicial" value="{{ def_inicial }}" min="10" max="20" step="0.01" required>
+                                    <small class="text-muted d-block mt-1" style="font-size: 0.7em;">10% - 20%</small>
+                                </div>
+                                <div class="col">
+                                    <label class="form-label text-secondary fw-bold" style="font-size: 0.85em;">Plazo (Meses)</label>
+                                    <input type="number" class="form-control" name="plazo" value="{{ def_plazo }}" min="24" max="36" step="1" required>
+                                    <small class="text-muted d-block mt-1" style="font-size: 0.7em;">24 - 36 m</small>
+                                </div>
                             </div>
-                            <div class="mb-3">
-                                <label class="form-label">Seguros Opcionales ($/Mes)</label>
-                                <input type="number" class="form-control" name="seg_opcional" value="25">
+                            
+                            <div class="row mb-3">
+                                <div class="col">
+                                    <label class="form-label text-secondary fw-bold" style="font-size: 0.85em;">TEA (%)</label>
+                                    <input type="number" class="form-control" name="tea" value="{{ def_tea }}" min="8.5" max="16.5" step="0.01" required>
+                                    <small class="text-muted d-block mt-1" style="font-size: 0.7em;">8.5% - 16.5%</small>
+                                </div>
+                                <div class="col">
+                                    <label class="form-label text-secondary fw-bold" style="font-size: 0.85em;">Cuota Balón (%)</label>
+                                    <input type="number" class="form-control" name="porc_balon" value="{{ def_balon }}" min="40" max="50" step="0.01" required>
+                                    <small class="text-muted d-block mt-1" style="font-size: 0.7em;">40% - 50%</small>
+                                </div>
                             </div>
-                            <button type="submit" class="btn btn-primary w-100">Calcular Cronograma</button>
+                            
+                            <div class="row mb-3">
+                                <div class="col-7">
+                                    <label class="form-label text-secondary fw-bold" style="font-size: 0.85em;">Tipo de Gracia</label>
+                                    <select class="form-select" name="tipo_gracia">
+                                        <option value="NINGUNO" {% if def_gracia == 'NINGUNO' %}selected{% endif %}>Sin Gracia</option>
+                                        <option value="PARCIAL" {% if def_gracia == 'PARCIAL' %}selected{% endif %}>Gracia Parcial</option>
+                                        <option value="TOTAL" {% if def_gracia == 'TOTAL' %}selected{% endif %}>Gracia Total</option>
+                                    </select>
+                                </div>
+                                <div class="col-5">
+                                    <label class="form-label text-secondary fw-bold" style="font-size: 0.85em;">Meses</label>
+                                    <input type="number" class="form-control" name="meses_gracia" value="{{ def_meses_gracia }}" min="1" max="3" step="1">
+                                    <small class="text-muted d-block mt-1" style="font-size: 0.7em;">1 - 3</small>
+                                </div>
+                            </div>
+                            
+                            <div class="row mb-4">
+                                <div class="col">
+                                    <label class="form-label text-secondary fw-bold" style="font-size: 0.8em;">Desgravamen (%)</label>
+                                    <input type="number" class="form-control" name="seg_desgravamen" value="{{ def_desgravamen }}" min="0.0375" max="0.1358" step="0.0001" required>
+                                    <small class="text-muted d-block mt-1" style="font-size: 0.7em;">0.0375% - 0.1358%</small>
+                                </div>
+                                <div class="col">
+                                    <label class="form-label text-secondary fw-bold" style="font-size: 0.8em;">Vehicular (%)</label>
+                                    <input type="number" class="form-control" name="seg_vehicular" value="{{ def_vehicular }}" min="0.2930" max="0.7360" step="0.0001" required>
+                                    <small class="text-muted d-block mt-1" style="font-size: 0.7em;">0.2930% - 0.7360%</small>
+                                </div>
+                            </div>
+
+                            <div class="mb-4 p-3 bg-light border rounded-3">
+                                <div class="form-check form-switch mb-2">
+                                    <input class="form-check-input" type="checkbox" id="check_seg_opcional" onchange="toggleSeguroOpcional()" {% if def_seg > 0 %}checked{% endif %}>
+                                    <label class="form-check-label fw-bold text-dark" for="check_seg_opcional" style="font-size: 0.9em;">Incluir Seguro de Accidentes</label>
+                                </div>
+                                <input type="number" class="form-control fw-bold text-success" name="seg_opcional" id="input_seg_opcional" 
+                                       value="{{ def_seg if def_seg > 0 else 0 }}" 
+                                       min="{{ '17.9' if def_seg > 0 else '0' }}" 
+                                       max="{{ '54.9' if def_seg > 0 else '0' }}" 
+                                       step="0.01" 
+                                       {% if def_seg == 0 %}readonly{% endif %}>
+                                <small class="text-muted d-block mt-1" style="font-size: 0.75em;">S/. 17.90 - S/. 54.90</small>
+                            </div>
+                            
+                            <button type="submit" class="btn-financiar w-100 py-3 text-uppercase shadow-sm {{ 'btn-editar-mode' if edit_mode else '' }}">
+                                {{ '💾 Guardar Cambios' if edit_mode else 'Simular y Guardar Crédito' }}
+                            </button>
                         </form>
                     </div>
                 </div>
@@ -62,42 +351,62 @@
 
             <div class="col-md-8">
                 {% if resultados %}
-                <div class="alert alert-success shadow-sm">
-                    <h5 class="alert-heading">Indicadores Financieros (Deudor)</h5>
+                <div class="alert alert-{{ 'warning text-dark' if edit_mode else 'success' }} shadow-sm rounded-4 border-0 mb-4 p-4">
+                    <h5 class="alert-heading fw-bold mb-3"><i class="bi bi-bar-chart-line-fill me-2"></i>Indicadores Financieros Oficiales</h5>
                     <div class="row text-center mt-3">
-                        <div class="col"><strong>TCEA:</strong><br>{{ "%.2f"|format(resultados.tcea * 100) }}%</div>
-                        <div class="col"><strong>VAN:</strong><br>${{ "%.2f"|format(resultados.van) }}</div>
-                        <div class="col"><strong>TIR Mensual:</strong><br>{{ "%.2f"|format(resultados.tir * 100) }}%</div>
-                        <div class="col"><strong>Total Pagado:</strong><br>${{ "%.2f"|format(resultados.total_pagado) }}</div>
+                        <div class="col border-end border-{{ 'dark' if edit_mode else 'success' }} border-opacity-25">
+                            <span class="d-block text-uppercase small fw-bold opacity-75 mb-1">TCEA Final</span>
+                            <span class="fs-4 fw-bold">{{ "%.2f"|format(resultados.tcea * 100) }}%</span>
+                        </div>
+                        <div class="col border-end border-{{ 'dark' if edit_mode else 'success' }} border-opacity-25">
+                            <span class="d-block text-uppercase small fw-bold opacity-75 mb-1">VAN</span>
+                            <span class="fs-4 fw-bold">${{ "%.2f"|format(resultados.van) }}</span>
+                        </div>
+                        <div class="col border-end border-{{ 'dark' if edit_mode else 'success' }} border-opacity-25">
+                            <span class="d-block text-uppercase small fw-bold opacity-75 mb-1">TIR Mensual</span>
+                            <span class="fs-4 fw-bold">{{ "%.2f"|format(resultados.tir * 100) }}%</span>
+                        </div>
+                        <div class="col">
+                            <span class="d-block text-uppercase small fw-bold opacity-75 mb-1">Total a Pagar</span>
+                            <span class="fs-4 fw-bold">${{ "%.2f"|format(resultados.total_pagado) }}</span>
+                        </div>
                     </div>
                 </div>
 
-                <div class="card shadow-sm mt-4">
-                    <div class="card-header bg-dark text-white">Calendario de Pagos</div>
-                    <div class="card-body p-0" style="max-height: 500px; overflow-y: auto;">
-                        <table class="table table-striped table-hover mb-0 text-center" style="font-size: 0.9em;">
-                            <thead>
+                <div class="card shadow-sm border-0 rounded-4 overflow-hidden">
+                    <div class="card-header bg-dark text-white border-0 py-3">
+                        <h6 class="mb-0 fw-bold"><i class="bi bi-calendar-check me-2"></i>Calendario de Pagos Estructurado</h6>
+                    </div>
+                    <div class="card-body p-0" style="max-height: 600px; overflow-y: auto;">
+                        <table class="table table-striped table-hover mb-0 text-center align-middle" style="font-size: 0.9em;">
+                            <thead class="table-light sticky-top shadow-sm">
                                 <tr>
-                                    <th>N°</th>
-                                    <th>Tipo</th>
-                                    <th>Saldo Inicial</th>
+                                    <th class="py-3">Mes</th>
+                                    <th>Fase</th>
+                                    <th>Saldo Inic.</th>
                                     <th>Interés</th>
-                                    <th>Cuota Base</th>
-                                    <th>Seguros</th>
-                                    <th>Pago Total</th>
+                                    <th>Cuota</th>
+                                    <th>Seguros Fijos</th>
+                                    <th class="text-primary">Pago Total</th>
                                     <th>Saldo Final</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for fila in cronograma %}
                                 <tr>
-                                    <td>{{ fila.periodo }}</td>
-                                    <td><span class="badge bg-secondary">{{ fila.tipo_gracia }}</span></td>
+                                    <td class="fw-bold">{{ fila.periodo }}</td>
+                                    <td>
+                                        {% if fila.tipo_gracia != 'NINGUNO' %}
+                                            <span class="badge bg-warning text-dark px-2 rounded-pill shadow-sm" style="font-size: 0.7em;">{{ fila.tipo_gracia }}</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary opacity-50 px-2 rounded-pill" style="font-size: 0.7em;">REGULAR</span>
+                                        {% endif %}
+                                    </td>
                                     <td>${{ "%.2f"|format(fila.saldo_inicial) }}</td>
-                                    <td>${{ "%.2f"|format(fila.interes) }}</td>
+                                    <td class="text-danger">${{ "%.2f"|format(fila.interes) }}</td>
                                     <td>${{ "%.2f"|format(fila.cuota) }}</td>
-                                    <td>${{ "%.2f"|format(fila.seguros) }}</td>
-                                    <td><strong>${{ "%.2f"|format(fila.pago_total) }}</strong></td>
+                                    <td class="text-secondary">${{ "%.2f"|format(fila.seguros) }}</td>
+                                    <td class="text-primary fw-bold" style="font-size: 1.05em;">${{ "%.2f"|format(fila.pago_total) }}</td>
                                     <td>${{ "%.2f"|format(fila.saldo_final) }}</td>
                                 </tr>
                                 {% endfor %}
@@ -106,12 +415,97 @@
                     </div>
                 </div>
                 {% else %}
-                <div class="alert alert-secondary text-center shadow-sm">
-                    <p class="mb-0">Completa el formulario y presiona "Calcular" para ver el cronograma aquí.</p>
+                <div class="alert bg-white text-center shadow-sm d-flex flex-column justify-content-center align-items-center rounded-4 border-0 h-100 p-5">
+                    <i class="bi bi-card-checklist text-muted mb-3" style="font-size: 4rem; opacity: 0.3;"></i>
+                    <h5 class="fw-bold text-dark">Simulador en Espera</h5>
+                    <p class="text-muted mb-0">Selecciona un vehículo del catálogo para empezar a estructurar el cronograma matemático.</p>
                 </div>
                 {% endif %}
             </div>
         </div>
     </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <script>
+        function abrirConfigurador(idVehiculo) {
+            document.getElementById('vista-catalogo').classList.add('d-none');
+            document.getElementById('vista-configurador').classList.remove('d-none');
+            document.getElementById('select-vehiculo').value = idVehiculo;
+            window.scrollTo(0, 0); 
+        }
+
+        function volverCatalogo() {
+            document.getElementById('vista-configurador').classList.add('d-none');
+            document.getElementById('vista-catalogo').classList.remove('d-none');
+            window.scrollTo(0, 0);
+        }
+
+        function filtrarAutos() {
+            let texto = document.getElementById('buscadorVehiculos').value.toLowerCase();
+            let marca = document.getElementById('filtroMarca').value.toLowerCase();
+            let precio = document.getElementById('filtroPrecio').value;
+            let ano = document.getElementById('filtroAno').value;
+
+            let cards = document.querySelectorAll('.auto-card');
+            let count = 0;
+
+            cards.forEach(card => {
+                let cardTexto = card.getAttribute('data-texto');
+                let cardMarca = card.getAttribute('data-marca');
+                let cardPrecio = parseFloat(card.getAttribute('data-precio'));
+                let cardAno = card.getAttribute('data-ano');
+
+                // Validaciones de coincidencia
+                let matchTexto = cardTexto.includes(texto);
+                let matchMarca = (marca === "" || cardMarca === marca);
+                let matchAno = (ano === "" || cardAno === ano);
+                
+                // Validación del rango de precios
+                let matchPrecio = true;
+                if (precio !== "") {
+                    let limites = precio.split('-');
+                    let min = parseFloat(limites[0]);
+                    let max = parseFloat(limites[1]);
+                    if (cardPrecio < min || cardPrecio > max) {
+                        matchPrecio = false;
+                    }
+                }
+
+                if (matchTexto && matchMarca && matchAno && matchPrecio) {
+                    card.style.display = "block";
+                    count++;
+                } else {
+                    card.style.display = "none";
+                }
+            });
+            
+            // Actualizar el texto dinámico del contador
+            document.getElementById('contador-autos').innerText = `Mostrando ${count} vehículos`;
+        }
+
+        function toggleSeguroOpcional() {
+            const checkbox = document.getElementById('check_seg_opcional');
+            const input = document.getElementById('input_seg_opcional');
+            
+            if (checkbox.checked) {
+                input.readOnly = false;
+                input.min = "17.9";
+                input.max = "54.9";
+                if (input.value == "0" || input.value === "") {
+                    input.value = "17.9"; 
+                }
+            } else {
+                input.readOnly = true;
+                input.min = "0";
+                input.max = "0";
+                input.value = "0";
+            }
+        }
+        
+        document.addEventListener("DOMContentLoaded", function() {
+            toggleSeguroOpcional();
+        });
+    </script>
 </body>
 </html>
