@@ -44,6 +44,8 @@ def generar_cronograma_credito(precio_vehiculo, cuota_inicial_porc, tea, plazo_m
         if t == plazo_meses: 
             cuota_base_t += cuota_balon 
             pago_total_t += cuota_balon
+            amortizacion_t += cuota_balon  
+            saldo_vigente = 0.0           
             
         cronograma.append({
             'periodo': t,
