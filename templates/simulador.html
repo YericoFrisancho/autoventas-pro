@@ -456,12 +456,10 @@
                 let cardPrecio = parseFloat(card.getAttribute('data-precio'));
                 let cardAno = card.getAttribute('data-ano');
 
-                // Validaciones de coincidencia
                 let matchTexto = cardTexto.includes(texto);
                 let matchMarca = (marca === "" || cardMarca === marca);
                 let matchAno = (ano === "" || cardAno === ano);
-                
-                // Validación del rango de precios
+            
                 let matchPrecio = true;
                 if (precio !== "") {
                     let limites = precio.split('-');
@@ -480,7 +478,6 @@
                 }
             });
             
-            // Actualizar el texto dinámico del contador
             document.getElementById('contador-autos').innerText = `Mostrando ${count} vehículos`;
         }
 

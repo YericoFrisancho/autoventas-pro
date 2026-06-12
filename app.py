@@ -32,12 +32,10 @@ def ejecutar_migracion_estructural():
     except Exception as e:
         print(f"Nota sobre migración estructural de tipos: {e}")
 
-# NUEVO: La ruta raíz ahora muestra tu Landing Page de Figma
 @app.route('/')
 def inicio():
     if 'usuario_id' in session:
         return redirect(url_for('simulador'))
-    # Renderizamos la nueva pantalla en lugar de forzar el redirect a login
     return render_template('inicio.html')
 
 @app.route('/login', methods=['GET', 'POST'])

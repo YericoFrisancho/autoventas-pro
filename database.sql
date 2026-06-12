@@ -1,4 +1,3 @@
--- 1. Tabla Clientes [cite: 1090]
 CREATE TABLE clientes (
     id_cliente INT PRIMARY KEY,
     nombre VARCHAR(20) NOT NULL,
@@ -8,7 +7,6 @@ CREATE TABLE clientes (
     dni CHAR(8) UNIQUE NOT NULL
 );
 
--- 2. Tabla Vehículos [cite: 1093]
 CREATE TABLE vehiculos (
     id_vehiculo INT PRIMARY KEY,
     marca VARCHAR(20) NOT NULL,
@@ -18,7 +16,6 @@ CREATE TABLE vehiculos (
     precio_venta DECIMAL(12,2) NOT NULL
 );
 
--- 3. Tabla Créditos 
 CREATE TABLE creditos (
     id_credito INT PRIMARY KEY,
     id_cliente INT NOT NULL,
@@ -38,7 +35,6 @@ CREATE TABLE creditos (
     CONSTRAINT fk_credito_vehiculo FOREIGN KEY (id_vehiculo) REFERENCES vehiculos(id_vehiculo)
 );
 
--- 4. Tabla Cronograma [cite: 1086]
 CREATE TABLE cronograma (
     id_cronograma INT PRIMARY KEY,
     id_credito INT NOT NULL,
@@ -53,7 +49,6 @@ CREATE TABLE cronograma (
     CONSTRAINT fk_cronograma_credito FOREIGN KEY (id_credito) REFERENCES creditos(id_credito)
 );
 
--- 5. Tabla Resultado Crédito [cite: 1084]
 CREATE TABLE resultado_credito (
     id_resultado INT PRIMARY KEY,
     id_credito INT NOT NULL,
