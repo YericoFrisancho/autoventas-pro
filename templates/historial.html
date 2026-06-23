@@ -101,6 +101,7 @@
                             <th class="text-secondary">Vehículo</th>
                             <th class="text-secondary">Monto Financiado</th>
                             <th class="text-secondary">TCEA</th>
+                            <th class="text-secondary">COK</th>
                             <th class="text-secondary">Total Pagado</th>
                             <th class="text-secondary">Acciones</th>
                         </tr>
@@ -114,6 +115,7 @@
                                 <td class="fw-bold">{{ h[2] }} <span class="fw-normal text-muted">{{ h[3] }}</span></td>
                                 <td>${{ "%.2f"|format(h[4]) }}</td>
                                 <td><span class="badge bg-danger px-2 py-1 rounded-pill">{{ "%.2f"|format(h[5] * 100) }}%</span></td>
+                                <td><span class="badge bg-primary bg-opacity-75 px-2 py-1 rounded-pill text-white">{{ "%g"|format(h[7] * 100) }}%</span></td>
                                 <td class="text-primary fw-bold fs-6">${{ "%.2f"|format(h[6]) }}</td>
                                 <td>
                                     <a href="/editar/{{ h[0] }}" class="btn btn-outline-primary btn-sm fw-bold px-3 rounded-pill">Ver / Editar</a>
@@ -122,7 +124,7 @@
                             {% endfor %}
                         {% else %}
                             <tr>
-                                <td colspan="7" class="py-5 text-muted">
+                                <td colspan="8" class="py-5 text-muted">
                                     <i class="bi bi-inbox d-block mb-2" style="font-size: 2rem;"></i>
                                     Aún no tienes simulaciones guardadas en tu base de datos.
                                 </td>

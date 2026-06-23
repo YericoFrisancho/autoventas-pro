@@ -26,11 +26,19 @@ def ejecutar_migracion_estructural():
         cur = conn.cursor()
         cur.execute('ALTER TABLE creditos ALTER COLUMN seguro_desgravamen TYPE DECIMAL(8,6);')
         cur.execute('ALTER TABLE creditos ALTER COLUMN seguro_vehicular_porc TYPE DECIMAL(8,6);')
+        cur.execute('ALTER TABLE creditos ADD COLUMN IF NOT EXISTS cok DECIMAL(8,6) DEFAULT 0.20;')
         conn.commit()
         cur.close()
         conn.close()
     except Exception as e:
-        print(f"Nota sobre migración estructural de tipos: {e}")
+        pass
+
+# Función maestra para preservar el ingreso exacto de los decimales del usuario en la UI
+def clean_float(val):
+    if val is None:
+        return 0
+    v = float(val)
+    return int(v) if v.is_integer() else v
 
 @app.route('/')
 def inicio():
@@ -42,11 +50,9 @@ def inicio():
 def login():
     if 'usuario_id' in session:
         return redirect(url_for('simulador'))
-        
     if request.method == 'POST':
         correo = request.form['correo']
         contrasenia = request.form['contrasenia']
-        
         try:
             conn = get_db_connection()
             cur = conn.cursor()
@@ -54,7 +60,6 @@ def login():
             cliente = cur.fetchone()
             cur.close()
             conn.close()
-            
             if cliente:
                 session['usuario_id'] = cliente[0]
                 session['usuario_nombre'] = cliente[1]
@@ -62,28 +67,24 @@ def login():
             else:
                 flash('Correo o contraseña incorrectos', 'danger')
         except Exception as e:
-            flash(f'Error al conectar con la base de datos: {e}', 'danger')
-            
+            flash(f'Error al conectar: {e}', 'danger')
     return render_template('login.html')
 
 @app.route('/registro', methods=['GET', 'POST'])
 def registro():
     if 'usuario_id' in session:
         return redirect(url_for('simulador'))
-        
     if request.method == 'POST':
         nombre = request.form['nombre']
         apellido = request.form['apellido']
         dni = request.form['dni']
         correo = request.form['correo']
         contrasenia = request.form['contrasenia']
-        
         try:
             conn = get_db_connection()
             cur = conn.cursor()
             cur.execute('SELECT COALESCE(MAX(id_cliente), 0) + 1 FROM clientes')
             nuevo_id = cur.fetchone()[0]
-            
             cur.execute(
                 'INSERT INTO clientes (id_cliente, nombre, apellido, correo, contrasenia, dni) VALUES (%s, %s, %s, %s, %s, %s)',
                 (nuevo_id, nombre, apellido, correo, contrasenia, dni)
@@ -91,15 +92,12 @@ def registro():
             conn.commit()
             cur.close()
             conn.close()
-            
-            flash('Registro exitoso. ¡Ya puedes iniciar sesión!', 'success')
+            flash('Registro exitoso.', 'success')
             return redirect(url_for('login'))
-            
         except psycopg2.IntegrityError:
-            flash('El correo o el DNI ingresado ya se encuentran registrados.', 'danger')
+            flash('El correo o el DNI ya están registrados.', 'danger')
         except Exception as e:
-            flash(f'Error al registrar el usuario: {e}', 'danger')
-            
+            flash(f'Error: {e}', 'danger')
     return render_template('registro.html')
 
 @app.route('/simulador', methods=['GET', 'POST'])
@@ -121,35 +119,38 @@ def simulador():
             id_vehiculo = int(request.form['id_vehiculo'])
             cuota_inicial_porc = float(request.form['cuota_inicial']) / 100
             tea = float(request.form['tea']) / 100
+            cok = float(request.form['cok']) / 100
             plazo = int(request.form['plazo'])
             porc_balon = float(request.form['porc_balon']) / 100
             tipo_gracia = request.form['tipo_gracia']
             meses_gracia = int(request.form['meses_gracia'])
-            
             seg_desgravamen = float(request.form['seg_desgravamen']) / 100
             seg_vehicular = float(request.form['seg_vehicular']) / 100
             seg_opcional = float(request.form.get('seg_opcional', 0))
+
+            if cok <= tea:
+                flash('El COK Anual debe ser estrictamente mayor a la TEA.', 'danger')
+                return render_template('simulador.html', vehiculos=vehiculos, edit_mode=False)
             
             cur.execute('SELECT precio_venta FROM vehiculos WHERE id_vehiculo = %s', (id_vehiculo,))
             precio = float(cur.fetchone()[0])
             
             cronograma, resultados = generar_cronograma_credito(
                 precio, cuota_inicial_porc, tea, plazo, porc_balon,
-                tipo_gracia, meses_gracia, seg_desgravamen, seg_vehicular, seg_opcional
+                tipo_gracia, meses_gracia, seg_desgravamen, seg_vehicular, seg_opcional, cok
             )
             
             cur.execute('SELECT COALESCE(MAX(id_credito), 0) + 1 FROM creditos')
             nuevo_id_credito = cur.fetchone()[0]
-            
             fecha_actual = datetime.datetime.now()
-            cuota_inicial_monto = precio * cuota_inicial_porc
-            monto_prestamo = precio - cuota_inicial_monto
+            cuota_inicial_monto = round(precio * cuota_inicial_porc, 2)
+            monto_prestamo = round(precio - cuota_inicial_monto, 2)
             
             cur.execute('''
                 INSERT INTO creditos 
-                (id_credito, id_cliente, id_vehiculo, fecha_prestamo, cuota_inicial, monto_prestamo, tasa_efectiva, plazo_meses, gracia_tipo, gracia_num_periodos, porcentaje_globo, seguro_desgravamen, seguro_vehicular_porc, seguro_protec_tarjetas)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            ''', (nuevo_id_credito, session['usuario_id'], id_vehiculo, fecha_actual, cuota_inicial_monto, monto_prestamo, tea, plazo, tipo_gracia, meses_gracia, porc_balon, seg_desgravamen, seg_vehicular, seg_opcional))
+                (id_credito, id_cliente, id_vehiculo, fecha_prestamo, cuota_inicial, monto_prestamo, tasa_efectiva, plazo_meses, gracia_tipo, gracia_num_periodos, porcentaje_globo, seguro_desgravamen, seguro_vehicular_porc, seguro_protec_tarjetas, cok)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            ''', (nuevo_id_credito, session['usuario_id'], id_vehiculo, fecha_actual, cuota_inicial_monto, monto_prestamo, tea, plazo, tipo_gracia, meses_gracia, porc_balon, seg_desgravamen, seg_vehicular, seg_opcional, cok))
             
             tep = (1 + tea)**(30/360) - 1
             cur.execute('SELECT COALESCE(MAX(id_cronograma), 0) FROM cronograma')
@@ -173,11 +174,10 @@ def simulador():
             ''', (nuevo_id_res, nuevo_id_credito, resultados['tcea'], resultados['van'], resultados['tir'], resultados['total_pagado'], resultados['intereses_totales']))
             
             conn.commit()
-            flash('Simulación procesada y guardada en la base de datos exitosamente.', 'success')
+            flash('Simulación procesada y guardada.', 'success')
             
         cur.close()
         conn.close()
-        
     except Exception as e:
         flash(f'Error de sistema: {e}', 'danger')
             
@@ -194,7 +194,7 @@ def editar(id_credito):
         
         cur.execute('SELECT id_credito FROM creditos WHERE id_credito = %s AND id_cliente = %s', (id_credito, session['usuario_id']))
         if not cur.fetchone():
-            flash('No tienes permiso para editar este crédito.', 'danger')
+            flash('No tienes permiso.', 'danger')
             return redirect(url_for('historial'))
 
         if request.method == 'GET':
@@ -204,33 +204,35 @@ def editar(id_credito):
             cur.execute('''
                 SELECT c.id_vehiculo, c.cuota_inicial, c.tasa_efectiva, c.plazo_meses,
                        c.porcentaje_globo, c.gracia_tipo, c.gracia_num_periodos, c.seguro_protec_tarjetas,
-                       c.seguro_desgravamen, c.seguro_vehicular_porc, v.precio_venta
+                       c.seguro_desgravamen, c.seguro_vehicular_porc, c.cok, v.precio_venta
                 FROM creditos c
                 JOIN vehiculos v ON c.id_vehiculo = v.id_vehiculo
                 WHERE c.id_credito = %s
             ''', (id_credito,))
             row = cur.fetchone()
             
-            precio_vehiculo = float(row[10])
+            precio_vehiculo = float(row[11])
             cuota_inicial_monto = float(row[1])
             
+            # Limpiamos todos los valores para mantener estrictamente la visualización dictada por el usuario
             credito_edit = {
                 'id_credito': id_credito,
                 'id_vehiculo': row[0],
-                'cuota_inicial_porc': (cuota_inicial_monto / precio_vehiculo) * 100,
-                'tea': float(row[2]) * 100,
+                'cuota_inicial_porc': clean_float((cuota_inicial_monto / precio_vehiculo) * 100),
+                'tea': clean_float(float(row[2]) * 100),
                 'plazo': row[3],
-                'porc_balon': float(row[4]) * 100,
+                'porc_balon': clean_float(float(row[4]) * 100),
                 'tipo_gracia': row[5],
                 'meses_gracia': row[6],
-                'seg_opcional': float(row[7]),
-                'seg_desgravamen': float(row[8]) * 100,
-                'seg_vehicular': float(row[9]) * 100
+                'seg_opcional': clean_float(float(row[7])),
+                'seg_desgravamen': clean_float(float(row[8]) * 100),
+                'seg_vehicular': clean_float(float(row[9]) * 100),
+                'cok': clean_float(float(row[10]) * 100)
             }
             
             cronograma, resultados = generar_cronograma_credito(
                 precio_vehiculo, (cuota_inicial_monto / precio_vehiculo), float(row[2]), int(row[3]), 
-                float(row[4]), row[5], int(row[6]), float(row[8]), float(row[9]), float(row[7])
+                float(row[4]), row[5], int(row[6]), float(row[8]), float(row[9]), float(row[7]), float(row[10])
             )
             
             cur.close()
@@ -242,33 +244,37 @@ def editar(id_credito):
             id_vehiculo = int(request.form['id_vehiculo'])
             cuota_inicial_porc = float(request.form['cuota_inicial']) / 100
             tea = float(request.form['tea']) / 100
+            cok = float(request.form['cok']) / 100
             plazo = int(request.form['plazo'])
             porc_balon = float(request.form['porc_balon']) / 100
             tipo_gracia = request.form['tipo_gracia']
             meses_gracia = int(request.form['meses_gracia'])
-            
             seg_desgravamen = float(request.form['seg_desgravamen']) / 100
             seg_vehicular = float(request.form['seg_vehicular']) / 100
             seg_opcional = float(request.form.get('seg_opcional', 0))
             
+            if cok <= tea:
+                flash('El COK Anual debe ser estrictamente mayor a la TEA.', 'danger')
+                return redirect(url_for('editar', id_credito=id_credito))
+
             cur.execute('SELECT precio_venta FROM vehiculos WHERE id_vehiculo = %s', (id_vehiculo,))
             precio = float(cur.fetchone()[0])
             
             cronograma, resultados = generar_cronograma_credito(
                 precio, cuota_inicial_porc, tea, plazo, porc_balon,
-                tipo_gracia, meses_gracia, seg_desgravamen, seg_vehicular, seg_opcional
+                tipo_gracia, meses_gracia, seg_desgravamen, seg_vehicular, seg_opcional, cok
             )
             
-            cuota_inicial_monto = precio * cuota_inicial_porc
-            monto_prestamo = precio - cuota_inicial_monto
+            cuota_inicial_monto = round(precio * cuota_inicial_porc, 2)
+            monto_prestamo = round(precio - cuota_inicial_monto, 2)
             
             cur.execute('''
                 UPDATE creditos
                 SET id_vehiculo=%s, cuota_inicial=%s, monto_prestamo=%s, tasa_efectiva=%s, plazo_meses=%s,
                     gracia_tipo=%s, gracia_num_periodos=%s, porcentaje_globo=%s, seguro_protec_tarjetas=%s,
-                    seguro_desgravamen=%s, seguro_vehicular_porc=%s
+                    seguro_desgravamen=%s, seguro_vehicular_porc=%s, cok=%s
                 WHERE id_credito=%s
-            ''', (id_vehiculo, cuota_inicial_monto, monto_prestamo, tea, plazo, tipo_gracia, meses_gracia, porc_balon, seg_opcional, seg_desgravamen, seg_vehicular, id_credito))
+            ''', (id_vehiculo, cuota_inicial_monto, monto_prestamo, tea, plazo, tipo_gracia, meses_gracia, porc_balon, seg_opcional, seg_desgravamen, seg_vehicular, cok, id_credito))
             
             cur.execute('DELETE FROM cronograma WHERE id_credito = %s', (id_credito,))
             
@@ -294,25 +300,25 @@ def editar(id_credito):
             
             cur.execute('SELECT id_vehiculo, marca, modelo, anio, precio_venta FROM vehiculos ORDER BY marca')
             vehiculos = cur.fetchall()
-            
             cur.close()
             conn.close()
             
             credito_edit = {
                 'id_credito': id_credito,
                 'id_vehiculo': id_vehiculo,
-                'cuota_inicial_porc': float(request.form['cuota_inicial']),
-                'tea': float(request.form['tea']),
+                'cuota_inicial_porc': clean_float(float(request.form['cuota_inicial'])),
+                'tea': clean_float(float(request.form['tea'])),
                 'plazo': plazo,
-                'porc_balon': float(request.form['porc_balon']),
+                'porc_balon': clean_float(float(request.form['porc_balon'])),
                 'tipo_gracia': tipo_gracia,
                 'meses_gracia': meses_gracia,
-                'seg_opcional': seg_opcional,
-                'seg_desgravamen': float(request.form['seg_desgravamen']),
-                'seg_vehicular': float(request.form['seg_vehicular'])
+                'seg_opcional': clean_float(seg_opcional),
+                'seg_desgravamen': clean_float(float(request.form['seg_desgravamen'])),
+                'seg_vehicular': clean_float(float(request.form['seg_vehicular'])),
+                'cok': clean_float(float(request.form['cok']))
             }
             
-            flash('¡Cambios guardados con éxito! El nuevo cronograma e indicadores se han recalculado.', 'success')
+            flash('¡Cambios guardados con éxito!', 'success')
             return render_template('simulador.html', vehiculos=vehiculos, cronograma=cronograma, 
                                    resultados=resultados, edit_mode=True, credito_edit=credito_edit)
 
@@ -330,7 +336,7 @@ def historial():
         conn = get_db_connection()
         cur = conn.cursor()
         cur.execute('''
-            SELECT c.id_credito, TO_CHAR(c.fecha_prestamo, 'DD/MM/YYYY HH24:MI'), v.marca, v.modelo, c.monto_prestamo, r.tcea, r.total_pagado
+            SELECT c.id_credito, TO_CHAR(c.fecha_prestamo, 'DD/MM/YYYY HH24:MI'), v.marca, v.modelo, c.monto_prestamo, r.tcea, r.total_pagado, c.cok
             FROM creditos c
             JOIN vehiculos v ON c.id_vehiculo = v.id_vehiculo
             JOIN resultado_credito r ON c.id_credito = r.id_credito

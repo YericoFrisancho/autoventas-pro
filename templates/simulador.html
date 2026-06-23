@@ -97,7 +97,8 @@
     {% set def_inicial = credito_edit.cuota_inicial_porc if edit_mode else 20 %}
     {% set def_plazo = credito_edit.plazo if edit_mode else 24 %}
     {% set def_tea = credito_edit.tea if edit_mode else 15 %}
-    {% set def_balon = credito_edit.porc_balon if edit_mode else 40 %}
+    {% set def_cok = credito_edit.cok if edit_mode else 20 %}
+    {% set def_balon = credito_edit.porc_balon if edit_mode else 50 %}
     {% set def_gracia = credito_edit.tipo_gracia if edit_mode else 'PARCIAL' %}
     {% set def_meses_gracia = credito_edit.meses_gracia if edit_mode else 2 %}
     {% set def_desgravamen = credito_edit.seg_desgravamen if edit_mode else 0.05 %}
@@ -210,7 +211,7 @@
                             </div>
                             
                             <div class="d-flex justify-content-between align-items-center pt-3 border-top">
-                                <h4 class="price-text fw-bold mb-0">${{ "%.0f"|format(v[4]) }}</h4>
+                                <h4 class="price-text fw-bold mb-0">${{ "%.2f"|format(v[4]) }}</h4>
                                 <button type="button" class="btn-financiar" onclick="abrirConfigurador('{{ v[0] }}')">Financiar</button>
                             </div>
                         </div>
@@ -286,15 +287,20 @@
                             </div>
                             
                             <div class="row mb-3">
-                                <div class="col">
+                                <div class="col-4">
                                     <label class="form-label text-secondary fw-bold" style="font-size: 0.85em;">TEA (%)</label>
-                                    <input type="number" class="form-control" name="tea" value="{{ def_tea }}" min="8.5" max="16.5" step="0.01" required>
+                                    <input type="number" class="form-control" name="tea" id="input_tea" value="{{ def_tea }}" min="8.5" max="16.5" step="0.01" onchange="validarCok()" required>
                                     <small class="text-muted d-block mt-1" style="font-size: 0.7em;">8.5% - 16.5%</small>
                                 </div>
-                                <div class="col">
-                                    <label class="form-label text-secondary fw-bold" style="font-size: 0.85em;">Cuota Balón (%)</label>
-                                    <input type="number" class="form-control" name="porc_balon" value="{{ def_balon }}" min="40" max="50" step="0.01" required>
-                                    <small class="text-muted d-block mt-1" style="font-size: 0.7em;">40% - 50%</small>
+                                <div class="col-4">
+                                    <label class="form-label text-secondary fw-bold text-nowrap" style="font-size: 0.85em;">COK (%)</label>
+                                    <input type="number" class="form-control text-primary fw-bold" name="cok" id="input_cok" value="{{ def_cok }}" min="10" max="35" step="0.01" onchange="validarCok()" required>
+                                    <small class="text-muted d-block mt-1" style="font-size: 0.7em;" id="ayuda_cok">10% - 35%</small>
+                                </div>
+                                <div class="col-4">
+                                    <label class="form-label text-secondary fw-bold" style="font-size: 0.85em;">Balón (%)</label>
+                                    <input type="number" class="form-control" name="porc_balon" value="{{ def_balon }}" min="50" max="60" step="0.01" required>
+                                    <small class="text-muted d-block mt-1" style="font-size: 0.7em;">50% - 60%</small>
                                 </div>
                             </div>
                             
@@ -316,12 +322,12 @@
                             
                             <div class="row mb-4">
                                 <div class="col">
-                                    <label class="form-label text-secondary fw-bold" style="font-size: 0.8em;">Desgravamen (%)</label>
+                                    <label class="form-label text-secondary fw-bold" style="font-size: 0.8em;">Desgravamen</label>
                                     <input type="number" class="form-control" name="seg_desgravamen" value="{{ def_desgravamen }}" min="0.0375" max="0.1358" step="0.0001" required>
                                     <small class="text-muted d-block mt-1" style="font-size: 0.7em;">0.0375% - 0.1358%</small>
                                 </div>
                                 <div class="col">
-                                    <label class="form-label text-secondary fw-bold" style="font-size: 0.8em;">Vehicular (%)</label>
+                                    <label class="form-label text-secondary fw-bold" style="font-size: 0.8em;">Vehicular</label>
                                     <input type="number" class="form-control" name="seg_vehicular" value="{{ def_vehicular }}" min="0.2930" max="0.7360" step="0.0001" required>
                                     <small class="text-muted d-block mt-1" style="font-size: 0.7em;">0.2930% - 0.7360%</small>
                                 </div>
@@ -338,7 +344,7 @@
                                        max="{{ '54.9' if def_seg > 0 else '0' }}" 
                                        step="0.01" 
                                        {% if def_seg == 0 %}readonly{% endif %}>
-                                <small class="text-muted d-block mt-1" style="font-size: 0.75em;">S/. 17.90 - S/. 54.90</small>
+                                <small class="text-muted d-block mt-1" style="font-size: 0.75em;" id="ayuda_seg_opcional">S/. 17.90 - S/. 54.90</small>
                             </div>
                             
                             <button type="submit" class="btn-financiar w-100 py-3 text-uppercase shadow-sm {{ 'btn-editar-mode' if edit_mode else '' }}">
@@ -359,7 +365,7 @@
                             <span class="fs-4 fw-bold">{{ "%.2f"|format(resultados.tcea * 100) }}%</span>
                         </div>
                         <div class="col border-end border-{{ 'dark' if edit_mode else 'success' }} border-opacity-25">
-                            <span class="d-block text-uppercase small fw-bold opacity-75 mb-1">VAN</span>
+                            <span class="d-block text-uppercase small fw-bold opacity-75 mb-1">VAN (Rentabilidad)</span>
                             <span class="fs-4 fw-bold">${{ "%.2f"|format(resultados.van) }}</span>
                         </div>
                         <div class="col border-end border-{{ 'dark' if edit_mode else 'success' }} border-opacity-25">
@@ -375,7 +381,7 @@
 
                 <div class="card shadow-sm border-0 rounded-4 overflow-hidden">
                     <div class="card-header bg-dark text-white border-0 py-3">
-                        <h6 class="mb-0 fw-bold"><i class="bi bi-calendar-check me-2"></i>Calendario de Pagos Estructurado</h6>
+                        <h6 class="mb-0 fw-bold"><i class="bi bi-calendar-check me-2"></i>Calendario de Pagos Estructurado (Moneda a 2 Decimales)</h6>
                     </div>
                     <div class="card-body p-0" style="max-height: 600px; overflow-y: auto;">
                         <table class="table table-striped table-hover mb-0 text-center align-middle" style="font-size: 0.9em;">
@@ -384,11 +390,11 @@
                                     <th class="py-3">Mes</th>
                                     <th>Fase</th>
                                     <th>Saldo Inic.</th>
+                                    <th>Amortización</th>
                                     <th>Interés</th>
                                     <th>Cuota Base</th>
                                     <th>Seguros Fijos</th>
                                     <th class="text-primary">Pago Total</th>
-                                    <th>Amortización</th>
                                     <th>Saldo Final</th>
                                 </tr>
                             </thead>
@@ -404,13 +410,11 @@
                                         {% endif %}
                                     </td>
                                     <td>${{ "%.2f"|format(fila.saldo_inicial) }}</td>
+                                    <td class="text-success fw-bold">${{ "%.2f"|format(fila.amortizacion) }}</td>
                                     <td class="text-danger">${{ "%.2f"|format(fila.interes) }}</td>
                                     <td>${{ "%.2f"|format(fila.cuota) }}</td>
                                     <td class="text-secondary">${{ "%.2f"|format(fila.seguros) }}</td>
                                     <td class="text-primary fw-bold" style="font-size: 1.05em;">${{ "%.2f"|format(fila.pago_total) }}</td>
-                                    
-                                    <td class="text-success fw-bold">${{ "%.2f"|format(fila.amortizacion) }}</td>
-                                    
                                     <td>${{ "%.2f"|format(fila.saldo_final) }}</td>
                                 </tr>
                                 {% endfor %}
@@ -488,11 +492,13 @@
         function toggleSeguroOpcional() {
             const checkbox = document.getElementById('check_seg_opcional');
             const input = document.getElementById('input_seg_opcional');
+            const ayuda = document.getElementById('ayuda_seg_opcional');
             
             if (checkbox.checked) {
                 input.readOnly = false;
                 input.min = "17.9";
                 input.max = "54.9";
+                ayuda.innerText = "S/. 17.90 - S/. 54.90";
                 if (input.value == "0" || input.value === "") {
                     input.value = "17.9"; 
                 }
@@ -501,6 +507,7 @@
                 input.min = "0";
                 input.max = "0";
                 input.value = "0";
+                ayuda.innerText = "Desactivado";
             }
         }
         
@@ -522,16 +529,35 @@
                 inputMeses.max = "3";
                 inputMeses.classList.remove('bg-light', 'text-muted');
                 ayudaMeses.innerText = "1 - 3";
-                
                 if (inputMeses.value === "0" || inputMeses.value === "") {
                     inputMeses.value = "1"; 
                 }
             }
         }
 
+        function validarCok() {
+            let tea = parseFloat(document.getElementById('input_tea').value) || 0;
+            let cokInput = document.getElementById('input_cok');
+            let ayudaCok = document.getElementById('ayuda_cok');
+            let cok = parseFloat(cokInput.value) || 0;
+            
+            let minCok = (tea + 0.01).toFixed(2);
+            cokInput.min = minCok;
+            
+            // Actualización dinámica del texto de ayuda del COK
+            ayudaCok.innerText = `${minCok}% - 35%`;
+            
+            if (cok <= tea && cok !== 0) {
+                cokInput.setCustomValidity("El COK exigido debe ser estrictamente mayor a la TEA.");
+            } else {
+                cokInput.setCustomValidity("");
+            }
+        }
+
         document.addEventListener("DOMContentLoaded", function() {
             toggleSeguroOpcional();
             toggleGracia(); 
+            validarCok();
         });
     </script>
 </body>
